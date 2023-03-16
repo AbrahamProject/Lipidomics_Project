@@ -21,7 +21,7 @@ library(utils)
 github_url <- "https://github.com/AbrahamProject/Lipidomics_Project/blob/main/Data_analysis_function.R"  
 local_path <- "Destination Folder"  
 
-  #   Download the R script using the download.file() function  
+     #   Download the R script using the download.file() function  
 download.file(github_url, destfile = local_path, mode = "wb") 
  ################################################################################    
    
