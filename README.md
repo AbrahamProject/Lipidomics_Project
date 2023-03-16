@@ -1,6 +1,8 @@
 # Semester Project II: Lipidomics Data Analysis
 
-Overview of all R-scripts used during the project
+Overview of all R-scripts used during the project.
+To import all build in functions use the following code
+@####
 
 # I) Raw Data Analysis
 ### Raw_data_analysis_xcms.R
