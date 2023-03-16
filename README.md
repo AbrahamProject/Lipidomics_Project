@@ -1,5 +1,6 @@
 # Semester Project II: Lipidomics Data Analysis
 
+Overview of all R-scripts used during the project
 
 # I) Raw Data Analysis
 ### Raw_data_analysis_xcms.R
