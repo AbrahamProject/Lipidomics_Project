@@ -2,12 +2,12 @@
 
 Overview of all R-scripts used during the project.  
 To import all build in functions use the following code:  
- ################################################################
-  '#  Libraries  
+ ################################################################  
+  #  Libraries  
 install.packages("devtools")  
 library(devtools)  
- ################################################################################
-  '#  source of all used functions  
+ ################################################################################  
+  #  source of all used functions  
 source_url("https://raw.githubusercontent.com/AbrahamProject/Lipidomics_Project/main/Data_analysis_function.R" )  
 source_url("https://raw.githubusercontent.com/AbrahamProject/Lipidomics_Project/main/Processing_function.R" )  
  ################################################################################
