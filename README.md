@@ -38,9 +38,10 @@ download.file(github_url, destfile = local_path, mode = "wb")
 ### b) Data_analysis_function.R
 
 ## 2) Scripts using the functions
-### a) MS_dial_processing_script.R
-### b) MS_dial_Feature_script.R
-### c) MS_dial_summary_plots_script.R
-### d) MS_dial_differential_Analysis_script.R
-### e) MS_dial_CID_vs_EAD_script.R
+### a) Processing_script.R
+### b) MS_dial_processing_script.R
+### c) MS_dial_Feature_script.R
+### d) MS_dial_summary_plots_script.R
+### e) MS_dial_differential_Analysis_script.R
+### f) MS_dial_CID_vs_EAD_script.R
 
