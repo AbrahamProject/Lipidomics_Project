@@ -1075,7 +1075,8 @@ scaling<-function(data){
     
     ss <- (d - min_i)/(max_i - min_i)
     
-    S[i,]<- ss
+    S[i,]<- as.numeric( ss)
+    
   }
   return(S)
 }
@@ -1580,7 +1581,7 @@ sample_cluster<-function(data,phase,fragmentation,mode,log=F,scale=F){
   
   keep <- rowSums(d,na.rm=T) > 0
   d <- d[keep,]
-  lipids<-lipid[keep]
+  lipids<-lipids[keep]
   nrow(d)
   
   if(scale==T){
@@ -1883,11 +1884,157 @@ Bi_cluster<-function(data,phase,fragmentation,mode,log=F,topN=F,scale=F){
   return(p)
 }
 
+Bi_cluster<-function(data,phase,fragmentation,mode,log=F,topN=F,scale=F){
+  title <- paste0("Lipid-Sample Bi-clustering: ",phase," (",fragmentation,")")
+  conditions <- c(
+    expression(Delta*pgpB),
+    expression(Delta*cdh),
+    expression(Delta*cfa),
+    expression(Delta*plsX),
+    expression(Delta*opgB),
+    expression(Delta*clsC),
+    expression(Delta*pgpC),
+    expression(Delta*pldC),
+    expression(Delta*clsB),
+    expression(Delta*clsA),
+    expression(Delta*pldB),
+    expression(Delta*pldA),
+    expression(Delta*pgpA),
+    expression(Delta*aas),
+    expression(Delta*dgkA,
+               "Wilt Type")
+    
+  )
+  lipids<-data$`Metabolite name`
+  if(phase=="EP"){
+    s<-c(c(36:80),c(84:86))
+    name <- rep(c(paste0("EP ",c("WT",c(1:15)))),each=3)
+    samples <- name[order(name)]
+  }else if(phase=="SP"){
+    s<-c(c(87:131),c(135:137))
+    name <- rep(c(paste0("SP ",c("WT",c(1:15)))),each=3)
+    samples <- name[order(name)]
+  }
+  
+  
+  d<-data[,s]
+  lipids<-data$`Metabolite name`
+  d[d<0]<-0
+  
+  
+  if(log==TRUE){
+    d<-log10(d+1)
+  }
+  
+  if(scale==T){
+    d<-scaling(d)
+    
+  }
+  
+  
+  # Count matrix
+  lipids[which(lipids=="DG 25:7(4,7,10,13,16,19,22)/27:7(6,9,12,15,18,21,24)")]<-"DG 25:7/27:7"
+  x<-samples
+  x<-paste0(x," (",c(1:3),")")
+  colnames(d) <- x
+  rownames(d) <- paste0(1:length(lipids) ," ",lipids)
+  
+  
+  nrow(d)
+  
+  keep <- rowSums(d,na.rm=T) > 0
+  d <- d[keep,]
+  nrow(d)
+  
+  size=5
+  if(is.numeric(topN)==T){
+    
+    wt<-d[,46:48]
+    dgka<-d[,43:45]
+    
+    
+    variation<-rowMeans(dgka,na.rm = T)/rowMeans(wt,na.rm = T)
+    variation[variation==Inf]<-0
+    variation <- cbind(1:length(variation),variation)
+    
+    variation <- variation[order(variation[,2],decreasing = T),]
+    
+    order <- variation[,1]
+    
+    d<-d[order,]
+    
+    lipids<-lipids[order]
+    
+    index<-c(1:(topN-10))
+    index_not1<-c(109,129,133,136,147)
+    index_not2<-c(89,78,65,146,112)
+    
+    index<-c(index_not1,index,index_not2)
+    d<-d[index,]
+    lipids<-lipids[index]
+    size=9
+  }
+  
+  
+  sort_hclust <- function(...) as.hclust(dendsort(as.dendrogram(...)))
+  
+  
+  
+  #poison distance
+  if(mode=="Poiss"){
+    mat_cluster_cols <- sort_hclust(hclust(PoissonDistance(t(d))$dd))
+    
+    mat_cluster_rows <- sort_hclust(hclust(PoissonDistance(d)$dd))
+    
+    pheatmap(d,
+             cluster_cols      = mat_cluster_cols,
+             cluster_rows      = mat_cluster_rows,
+             fontsize_col = 10,
+             fontsize = 15,
+             fontsize_row = size,
+             labels_row = lipids,
+             labels_col = rep(conditions,each=3),angle_col="90",
+             main = title
+             
+             
+    )
+    
+    
+  }else if(mode=="Euclidean"){
+    
+    # euclidean distance
+    
+    sampleDists <- dist(((d)))
+    
+    mat_cluster_cols <- sort_hclust(hclust(dist(t(d))))
+    
+    mat_cluster_rows <- sort_hclust(hclust(dist(d)))
+    
+    pheatmap(d,
+             cluster_cols      = mat_cluster_cols,
+             cluster_rows      = mat_cluster_rows,
+             fontsize = 15,
+             fontsize_col = 10,
+             main=title,
+             fontsize_row = size,
+             labels_row = lipids,
+             labels_col = rep(conditions,each=3),angle_col="90"
+             
+    )
+    
+  }
+  
+  p<- recordPlot()
+  
+  plot.new()
+  
+  return(p)
+}
 ###############################################################################
 # FC 
 # function 2: Volcano Plots
 Fold_change<-function(data,phase,fragmentation,topN=F){
-  title <- paste0("Volcano Plots WT vs. KO (",fragmentation,"-",phase,")")
+  title <- paste0("Fold Change: WT vs. KO (",fragmentation,"-",phase,")")
   conditions <- c(
     expression(Delta*pgpB),
     expression(Delta*cdh),
@@ -2007,7 +2154,7 @@ Fold_change<-function(data,phase,fragmentation,topN=F){
   FoldChange[FoldChange== Inf] <-max(is.finite(unlist(FoldChange)))
   pheatmap(FoldChange,display_numbers = p_value,cluster_rows=FALSE, cluster_cols=FALSE,
            labels_row = lipids,fontsize = 15,main=title,
-           labels_col = (conditions),fontsize_row = size,angle_col="90",fontsize_number = 7,na_col="black" )
+           labels_col = (conditions),fontsize_row = size,angle_col="90",fontsize_number = 7,na_col="black",border_color = NA)
   
   p<-recordPlot()
   plot.new()  
@@ -3458,7 +3605,7 @@ library(insight)
 if (!require(devtools)) install.packages("devtools")
 devtools::install_github("yanlinlin82/ggvenn")
 library(Cairo)
-library(ggpubr)
+#library(ggpubr)
 library(xcms)
 library(mzR)
 library(MSnbase)
@@ -3567,7 +3714,7 @@ feature_overlap<-function(CID_wd,CID_name,EAD_wd,EAD_name,mz_tol = 0.05,rt_tol =
   
   wd<-getwd()
   setwd(directory_venn_diagram)
-  myCol <- brewer.pal(3, "Pastel2")[1:2]
+  myCol <- c("coral1","palegreen3")
   venn.diagram(
     x=list(C,E),
     category.names=c("CID","EAD"),filename = "Feature_venn_diagram.png",
@@ -3582,7 +3729,7 @@ feature_overlap<-function(CID_wd,CID_name,EAD_wd,EAD_name,mz_tol = 0.05,rt_tol =
     cex = 1.4,
     fontface = "bold",
     fontfamily = "sans",
-    
+    main.fontfamily =  'sans',
     # # Set names
     cat.cex = 1.8,
     cat.fontface = "bold",
@@ -3664,12 +3811,20 @@ lipid_overlap<-function(CID_wd,CID_name,EAD_wd,EAD_name,directory_venn_diagram){
   E<-EAD_unique[!is.na(EAD_unique)]
   
   
+  
+  C_store <- setdiff(C,E)
+  E_store <- setdiff(E,C)
+  UU<-matrix(ncol=2,nrow=max(c(length(C_store),length(E_store))))
+  colnames(UU)<-c("CID","EAD")
+  UU[1:length(C_store),1]<-C_store
+  UU[1:length(E_store),2]<-E_store
+  
   wd<-getwd()
   setwd(directory_venn_diagram)
-  myCol <- brewer.pal(3, "Pastel2")[1:2]
+  myCol <- c("coral1","palegreen3")
   venn.diagram(
     x=list(C,E),
-    category.names=c("CID","EAD"),filename = "Lipid_venn_diagram.png",
+    category.names=c("EAD","CID"),filename = "Lipid_venn_diagram.png",
     output=T,
     main="Lipid Species based Venn Diagram",
     main.cex = 2,
@@ -3681,14 +3836,16 @@ lipid_overlap<-function(CID_wd,CID_name,EAD_wd,EAD_name,directory_venn_diagram){
     cex = 1.4,
     fontface = "bold",
     fontfamily = "sans",
-    
+    rotation.degree =180,
     # # Set names
     cat.cex = 1.8,
     cat.fontface = "bold",
-    
+    main.fontfamily =  'sans',
     cat.fontfamily = "sans",
+    cat.dist = c(0.1, 0.08)
   ) 
   
+  write.csv(UU,paste0(directory_venn_diagram,"/unique_lipids.csv"))
   setwd(wd)
   
   return(Output)
@@ -3935,7 +4092,7 @@ cv_all<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   par(cex.main=1.8,cex.lab=1.6,cex.axis=1.4,mar=c(8,6,5,0))
   barplot(d,beside = T,col=c("coral1","palegreen3"),names.arg = conditions,las=2,
           ylab = "Coefficient of Variation [%]",
-          main="Coefficient of Variation across Conditions")
+          main="Mean CV: Biological Samples")
   par(mar=c(8,0,5,0))
   plot(1:10,1:10, xaxt = 'n', yaxt = 'n', bty = 'n', pch = '', ylab = '', xlab = '')
   legend("topleft",legend=c("CID","EAD"),cex=2,bty="n",col=c("coral1","palegreen3"),pch=15,pt.cex = 4,y.intersp=2)
@@ -3998,7 +4155,7 @@ cv_all<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   
   
   pie1<-ggplot(data, aes(x="", y=prop, fill=group)) +
-    labs(title = "CID CV distribution")+
+    labs(title = "Biological Samples")+
     geom_bar(stat="identity", width=1, color="white") +
     coord_polar("y", start=0) +
     theme_void() + 
@@ -4057,7 +4214,7 @@ cv_all<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   
   
   pie2<-ggplot(data2, aes(x="", y=prop1, fill=group)) +
-    labs(title = "EAD CV distribution")+
+    labs(title = "")+
     geom_bar(stat="identity", width=1, color="white") +
     coord_polar("y", start=0) +
     theme_void() + 
@@ -4073,7 +4230,7 @@ cv_all<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   
   mylegend<-g_legend(pie1)
   grid.arrange(arrangeGrob(pie1+theme(legend.position = "none"),
-                           pie2+theme(legend.position = "none"),nrow=1),
+                           pie2+theme(legend.position = "none"),nrow=2),
                mylegend, nrow=2,heights=c(8,1)) 
   
   p<-recordPlot()
@@ -4202,7 +4359,7 @@ cv_standard<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   par(cex.main=1.8,cex.lab=1.6,cex.axis=1.4,mar=c(8,6,5,0))
   barplot(d,beside = T,col=c("coral1","palegreen3"),names.arg = conditions,las=2,
           ylab = "Coefficient of Variation [%]",
-          main="Standards CV across Conditions")
+          main="Mean CV: Internal Standards")
   par(mar=c(8,0,5,0))
   plot(1:10,1:10, xaxt = 'n', yaxt = 'n', bty = 'n', pch = '', ylab = '', xlab = '')
   legend("topleft",legend=c("CID","EAD"),cex=2,bty="n",col=c("coral1","palegreen3"),pch=15,pt.cex = 4,y.intersp=2)
@@ -4265,7 +4422,7 @@ cv_standard<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   
   
   pie1<-ggplot(data, aes(x="", y=prop, fill=group)) +
-    labs(title = "CID CV distribution")+
+    labs(title = "Internal Standards")+
     geom_bar(stat="identity", width=1, color="white") +
     coord_polar("y", start=0) +
     theme_void() + 
@@ -4325,7 +4482,7 @@ cv_standard<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   
   
   pie2<-ggplot(data2, aes(x="", y=prop1, fill=group)) +
-    labs(title = "EAD CV distribution")+
+    labs(title = "")+
     geom_bar(stat="identity", width=1, color="white") +
     coord_polar("y", start=0) +
     theme_void() + 
@@ -4341,7 +4498,7 @@ cv_standard<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   
   mylegend<-g_legend(pie1)
   grid.arrange(arrangeGrob(pie1+theme(legend.position = "none"),
-                           pie2+theme(legend.position = "none"),nrow=1),
+                           pie2+theme(legend.position = "none"),nrow=2),
                mylegend, nrow=2,heights=c(8,1)) 
   
   p<-recordPlot()
@@ -4454,7 +4611,7 @@ cv_blanks<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   par(cex.main=1.8,cex.lab=1.6,cex.axis=1.4,mar=c(8,6,5,0))
   barplot(d,beside = T,col=c("coral1","palegreen3"),names.arg = conditions,las=2,
           ylab = "Coefficient of Variation [%]",
-          main="Standards CV across Conditions")
+          main="Mean CV: Blank Samples")
   par(mar=c(8,0,5,0))
   plot(1:10,1:10, xaxt = 'n', yaxt = 'n', bty = 'n', pch = '', ylab = '', xlab = '')
   legend("topleft",legend=c("CID","EAD"),cex=2,bty="n",col=c("coral1","palegreen3"),pch=15,pt.cex = 4,y.intersp=2)
@@ -4518,7 +4675,7 @@ cv_blanks<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   
   
   pie1<-ggplot(data, aes(x="", y=prop, fill=group)) +
-    labs(title = "CID CV distribution")+
+    labs(title = "Blank Samples")+
     geom_bar(stat="identity", width=1, color="white") +
     coord_polar("y", start=0) +
     theme_void() + 
@@ -4578,7 +4735,7 @@ cv_blanks<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   
   
   pie2<-ggplot(data2, aes(x="", y=prop1, fill=group)) +
-    labs(title = "EAD CV distribution")+
+    labs(title = "")+
     geom_bar(stat="identity", width=1, color="white") +
     coord_polar("y", start=0) +
     theme_void() + 
@@ -4594,7 +4751,7 @@ cv_blanks<-function(CID_wd,CID_name,EAD_wd,EAD_name){
   
   mylegend<-g_legend(pie1)
   grid.arrange(arrangeGrob(pie1+theme(legend.position = "none"),
-                           pie2+theme(legend.position = "none"),nrow=1),
+                           pie2+theme(legend.position = "none"),nrow=2),
                mylegend, nrow=2,heights=c(8,1)) 
   
   p<-recordPlot()
@@ -4778,8 +4935,8 @@ CID_vs_EAD<-function(EAD,CID,phase,fragmentation,Directory){
   master_peak_list <- CID[,c(1,2,3,5,8)]
   master_peak_list$CID<-c(1:nrow(CID))
   master_peak_list$EAD<-F
-  mz_tol<-mz_tol
-  rt_tol<-rt_tol #min
+  mz_tol<-0.05
+  rt_tol<-0.1 #min
   i=5
   for(i in 1:nrow(EAD)){
     RT<- as.numeric(E[i,2]) - as.numeric(master_peak_list[,2])
@@ -4898,8 +5055,7 @@ CID_vs_EAD<-function(EAD,CID,phase,fragmentation,Directory){
     
     P<-rep("16",nrow(dataframe_C))
     P[which(pvalue>0.05)]<-1
-    
-    
+
     dataframe_E <- de[,c(wt,ko)]
     dataframeE<-matrix(as.numeric(as.matrix(dataframe_E)),ncol=6)
     colnames(dataframeE)<-colnames(dataframe_E)
@@ -4919,7 +5075,10 @@ CID_vs_EAD<-function(EAD,CID,phase,fragmentation,Directory){
     
     
     
+    FF<-FC_log_E/FC_log_C
     
+    index<-which(FF>0.7 & FF < 1.3)
+    P[index]<-16
     
     par(mar=c(2,2,1,2),mgp=c(2,0.4,0),tcl=-0.2)
     plot(FC_log_C,FC_log_E,cex=1.5,ylab="",xlab="",col="black",cex.axis=1,pch=as.numeric(P))
@@ -5426,7 +5585,7 @@ CID_vs_EAD<-function(EAD,CID,phase,fragmentation,Directory){
       cex = 1.4,
       fontface = "bold",
       fontfamily = "sans",
-      
+      main.fontfamily = "sans" ,
       # # Set names
       cat.cex = 1.8,
       cat.fontface = "bold",
@@ -5521,7 +5680,8 @@ SN<-function(EAD,CID){
 
 
 
-gaussian<-function(CID,EAD){
+
+gaussian <- function(CID,EAD){
   E<-EAD[,c(1,2,3,5,8)]
   
   master_peak_list <- CID[,c(1,2,3,5,8)]
@@ -5709,7 +5869,7 @@ gaussian<-function(CID,EAD){
     
   }
   
-  setwd("W:/users/Abraham/Exp_004_version_2/Data/FUNCTION_R_DATA")
+  setwd("C:/FUNCTION_R_DATA")
   CID_S <- readMSData(files = "22_12_22_Exp_004_SP_Sam_WT_3_CID.mzML",mode = "onDisk") 
   
   EAD_S<- readMSData(files = "22_12_22_Exp_004_SP_Sam_WT_3_EAD.mzML",mode = "onDisk")
@@ -5761,7 +5921,7 @@ gaussian<-function(CID,EAD){
   
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
+  #fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"coral1")
@@ -5801,7 +5961,7 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,9,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
+  #fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"coral1")  
@@ -5847,7 +6007,7 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,5,smoothed$x[which(smoothed$y==max(smoothed$y))])      
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
+  #fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"coral1")
@@ -5882,7 +6042,7 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,5,smoothed$x[which(smoothed$y==max(smoothed$y))]+1)
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
+  #fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"coral1")  
@@ -5928,7 +6088,7 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,9,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
+  #fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"coral1")  
@@ -5941,7 +6101,11 @@ gaussian<-function(CID,EAD){
   
   p<-recordPlot()
   Output[[1]]<-p
+  par(mar=c(0,0,0,0))
   plot.new()
+  
+  while (dev.cur()>1) dev.off()
+  
   
   
   
@@ -5996,7 +6160,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,9,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"coral1")
@@ -6040,7 +6203,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,9,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"coral1")
@@ -6078,7 +6240,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,9,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"coral1")
@@ -6115,7 +6276,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y)+1000,1,10,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"coral1")  
@@ -6152,7 +6312,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,3,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"coral1")  
@@ -6165,15 +6324,18 @@ gaussian<-function(CID,EAD){
   
   p<-recordPlot()
   Output[[2]]<-p
+  par(mar=c(0,0,0,0))
   plot.new()
   
+  while (dev.cur()>1) dev.off()
+  
   ###########################################################
   ###########################################################
   ###########################################################
   ###########################################################
   
   
-  setwd("W:/users/Abraham/Exp_004_version_2/Data/FUNCTION_R_DATA")
+  setwd("C:/FUNCTION_R_DATA")
   CID_S <- readMSData(files = "22_12_22_Exp_004_SP_Sam_WT_3_CID.mzML",mode = "onDisk") 
   
   EAD_S<- readMSData(files = "22_12_22_Exp_004_SP_Sam_WT_3_EAD.mzML",mode = "onDisk")
@@ -6224,7 +6386,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,9,smoothed$x[which(smoothed$y==max(smoothed$y))])      
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"palegreen3")
@@ -6263,7 +6424,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,9,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"palegreen3")  
@@ -6310,7 +6470,6 @@ gaussian<-function(CID,EAD){
   
   pp<-c(max(smoothed$y),0.5,5,smoothed$x[which(smoothed$y==max(smoothed$y))])      
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"palegreen3")  
@@ -6348,7 +6507,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,5,smoothed$x[which(smoothed$y==max(smoothed$y))]+1)
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"palegreen3")  
@@ -6398,7 +6556,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,5,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"palegreen3")  
@@ -6411,7 +6568,10 @@ gaussian<-function(CID,EAD){
   
   p<-recordPlot()
   Output[[3]]<-p
+  par(mar=c(0,0,0,0))
   plot.new()
+  
+  while (dev.cur()>1) dev.off()
   
   
   
@@ -6467,7 +6627,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,9,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"palegreen3")  
@@ -6513,7 +6672,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,9,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"palegreen3")  
@@ -6553,7 +6711,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,9,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"palegreen3")  
@@ -6592,7 +6749,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,10,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"palegreen3")  
@@ -6630,7 +6786,6 @@ gaussian<-function(CID,EAD){
   pp<-c(max(smoothed$y),1,3,smoothed$x[which(smoothed$y==max(smoothed$y))])
   
   R<-as.numeric(rt)
-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   G<-  fit(smoothed$x,smoothed$y,pp,method="SANN",rt=R)
   
   dotscore(R,int,G,"palegreen3")  
@@ -6643,9 +6798,12 @@ gaussian<-function(CID,EAD){
   
   p<-recordPlot()
   Output[[4]]<-p
+  par(mar=c(0,0,0,0))
   plot.new()
   
+  while (dev.cur()>1) dev.off()
   
+  return(Output)
   
   
 }
@@ -6841,4 +6999,879 @@ Chord_plot<-function(data,phase,fragmentation){
   
   return(p)
 }
+
+
+
+
+
+
+
+plot_DG_16_1_18_1<-function(type=T){
+  Output<-vector(mode="list",2)
+  setwd("C:/FUNCTION_R_DATA")
+  
+  CID_15 <- readMSData(files = "22_12_22_Exp_004_SP_Sam_9_2_CID.mzML",mode = "onDisk") 
+  
+  EAD_15<- readMSData(files = "22_12_22_Exp_004_SP_Sam_9_2_EAD.mzML",mode = "onDisk")
+  
+  
+  
+  CID_12 <- readMSData(files = "22_12_22_Exp_004_EP_Sam_6_1_CID.mzML",mode = "onDisk") 
+  
+  EAD_12<- readMSData(files = "22_12_22_Exp_004_EP_Sam_6_1_EAD.mzML",mode = "onDisk")
+  
+  
+  
+  CID_9 <- readMSData(files = "22_12_22_Exp_004_EP_Sam_9_2_CID.mzML",mode = "onDisk") 
+  
+  EAD_9<- readMSData(files = "22_12_22_Exp_004_EP_Sam_9_2_EAD.mzML",mode = "onDisk")
+  
+  
+  
+  stoch_line<-function(x1,y1,x2,y2,color,N=40){
+    a<-(y2-y1)/(x2-x1)
+    b<-y1-a*x1
+    x<-seq(x1,x2,length=N)
+    y<-a*x+b
+    
+    
+    for(i in 1:length(y)){
+      random<-runif(1,min=0,max=2)
+      r<-runif(1,min=0,max=1)
+      
+      if(r>=0.4){
+        d<-1
+      }else{ d<- -1}
+      
+      value<-y[i]+(random*d)
+      
+      if(value<1){
+        value<- -1*value
+      }
+      y[i]<-value
+    }
+    
+    y[1]<-y1
+    y[length(y)] <- y2
+    
+    points(x,y,col=color,lwd=2,type="l")
+    
+  }
+  
+  # DG 16:1(9Z)/18:1(9)
+  
+  # CID
+  rt <- 4.65
+  delta <- 10
+  rtr <- c((rt*60)-delta,(rt*60)+delta)
+  
+  mzr<-c( (615.49522-0.08),(615.49522+0.08))
+  
+  c9 <- chromatogram(CID_9, mz = mzr, rt = rtr)
+  
+  rt<-rtime(c9[1,1])
+  int<-intensity(c9[1,1])
+  
+  
+  x<-rt[!is.na(int)]
+  y<-int[!is.na(int)]
+  smoothed <- smooth.spline(x,y,spar=0.5)
+  
+  rt<-smoothed$x
+  
+  int<-smoothed$y
+  
+  int <- int/max(int,na.rm=T)*100
+  
+  
+
+  
+  
+  
+  
+  rt_c9<-rt
+  int_c9<-int
+  
+  
+  # EAD
+  rt <- 4.65
+  delta <- 10
+  rtr <- c((rt*60)-delta,(rt*60)+delta)
+  
+  mzr<-c( (615.49522-0.08),(615.49522+0.08))
+  
+  e9 <- chromatogram(EAD_9, mz = mzr, rt = rtr)
+  
+  rt<-rtime(e9[1,1])
+  int<-intensity(e9[1,1])
+  
+  
+  x<-rt[!is.na(int)]
+  y<-int[!is.na(int)]
+  smoothed <- smooth.spline(x,y,spar=0.5)
+  
+  rt<-smoothed$x
+  
+  int<-smoothed$y
+  
+  int <- int/max(int,na.rm=T)*100
+  
+  
+  
+  
+  rt_e9<-rt
+  int_e9<-int
+  
+  
+  #####################################################################################
+  
+  # DG 16:1(9Z)/18:1(12)
+  
+  # CID
+  rt <- 10
+  delta <- 12
+  rtr <- c((rt*60)-delta,(rt*60)+delta)
+  
+  mzr<-c( (615.49522-0.08),(615.49522+0.08))
+  
+  c12 <- chromatogram(CID_12, mz = mzr, rt = rtr)
+  
+  rt<-rtime(c12[1,1])
+  int<-intensity(c12[1,1])
+  
+  
+  x<-rt[!is.na(int)]
+  y<-int[!is.na(int)]
+  smoothed <- smooth.spline(x,y,spar=0.8)
+  
+  rt<-smoothed$x
+  
+  int<-smoothed$y
+  
+  int <- int/max(int,na.rm=T)*100
+  
+
+  rt_c12<-rt
+  int_c12<-int
+  
+  
+  # EAD
+  rt <- 10
+  delta <- 12
+  rtr <- c((rt*60)-delta,(rt*60)+delta)
+  
+  mzr<-c( (615.49522-0.08),(615.49522+0.08))
+  
+  e12 <- chromatogram(EAD_12, mz = mzr, rt = rtr)
+  
+  rt<-rtime(e12[1,1])
+  int<-intensity(e12[1,1])
+  
+  
+  x<-rt[!is.na(int)]
+  y<-int[!is.na(int)]
+  smoothed <- smooth.spline(x,y,spar=0.8)
+  
+  rt<-smoothed$x
+  
+  int<-smoothed$y
+  
+  int <- int/max(int,na.rm=T)*100
+  
+
+  
+  rt_e12<-rt
+  int_e12<-int
+  
+  ##############################################################################
+  
+  
+  # DG 16:1(9Z)/18:1(15)
+  
+  # CID
+  rt <- 6.25
+  delta <- 12
+  rtr <- c((rt*60)-delta,(rt*60)+delta)
+  
+  mzr<-c( (615.49522-0.08),(615.49522+0.08))
+  
+  c15 <- chromatogram(CID_15, mz = mzr, rt = rtr)
+  
+  rt<-rtime(c15[1,1])
+  int<-intensity(c15[1,1])
+  
+  
+  
+  x<-rt[!is.na(int)]
+  y<-int[!is.na(int)]
+  smoothed <- smooth.spline(x,y,spar=0.5)
+  
+  rt<-smoothed$x
+  
+  int<-smoothed$y
+  
+  int <- int/max(int,na.rm=T)*100
+
+  
+  rt_c15<-rt
+  int_c15<-int
+  
+  
+  # EAD
+  rt <- 6.25
+  delta <- 12
+  rtr <- c((rt*60)-delta,(rt*60)+delta)
+  
+  mzr<-c( (615.49522-0.08),(615.49522+0.08))
+  
+  e15 <- chromatogram(EAD_15, mz = mzr, rt = rtr)
+  
+  rt<-rtime(e15[1,1])
+  int<-intensity(e15[1,1])
+  
+  
+  x<-rt[!is.na(int)]
+  y<-int[!is.na(int)]
+  smoothed <- smooth.spline(x,y,spar=0.4)
+  
+  rt<-smoothed$x
+  
+  int<-smoothed$y
+  
+  int <- int/max(int,na.rm=T)*100
+
+  
+  rt_e15<-rt
+  int_e15<-int
+  
+  
+  ##########################################################################################
+  # CID
+  par(yaxs="i")
+  par(mar=c(5,5,5,5),cex.lab=1.4,cex.axis=1,cex.main=1.5)
+  plot(rt_c9,int_c9,col="coral1",cex=2,pch=16,ylab="Rel. Intensity",xlab="Retention Time [s]",
+       main="XID DG 16:1/18:1 CID data",type="l",lwd=2,xlim=c(0,900),ylim=c(0,110))
+  points(rt_c12,int_c12,col="coral1",lwd=2,type="l")
+  points(rt_c15,int_c15,col="coral1",lwd=2,type="l")
+  
+  x1<-5
+  y1<-3
+  
+  x2<-rt_c9[1]
+  y2<-int_c9[1]
+  
+  
+  stoch_line(x1,y1,x2,y2,color="coral1")
+  
+  
+  x1<-rt_c9[length(rt_c9)]
+  y1<-int_c9[length(rt_c9)]
+  
+  x2<-rt_c15[1]
+  y2<-int_c15[1]
+  
+  
+  stoch_line(x1,y1,x2,y2,color="coral1",N=20)
+  
+  
+  x1<-rt_c15[length(rt_c15)]
+  y1<-int_c15[length(rt_c15)]
+  
+  x2<-rt_c12[1]
+  y2<-int_c12[1]
+  
+  
+  stoch_line(x1,y1,x2,y2,color="coral1")
+  
+  
+  x1<-rt_c12[length(rt_c12)]
+  y1<-int_c12[length(rt_c12)]
+  
+  x2<-897
+  y2<-6
+  
+  
+  stoch_line(x1,y1,x2,y2,color="coral1")
+  
+  p<-recordPlot()
+  
+  Output[[1]]<-p
+  plot.new()
+  # EAD
+  par(yaxs="i")
+  plot(rt_e9,int_e9,col="palegreen3",cex=2,pch=16,ylab="Intensity",xlab="Retention Time [s]",
+       main="XID DG 16:1/18:1 CID data",type="l",lwd=2,xlim=c(0,900),ylim=c(0,110))
+  points(rt_e12,int_e12,col="palegreen3",lwd=2,type="l")
+  points(rt_e15,int_e15,col="palegreen3",lwd=2,type="l")
+  
+  x1<-5
+  y1<-3
+  
+  x2<-rt_e9[1]
+  y2<-int_e9[1]
+  
+  
+  stoch_line(x1,y1,x2,y2,color="palegreen3")
+  
+  
+  x1<-rt_e9[length(rt_e9)]
+  y1<-int_e9[length(rt_e9)]
+  
+  x2<-rt_e15[1]
+  y2<-int_e15[1]
+  
+  
+  stoch_line(x1,y1,x2,y2,color="palegreen3",N=20)
+  
+  
+  x1<-rt_e15[length(rt_e15)]
+  y1<-int_e15[length(rt_e15)]
+  
+  x2<-rt_e12[1]
+  y2<-int_e12[1]
+  
+  
+  stoch_line(x1,y1,x2,y2,color="palegreen3")
+  
+  
+  x1<-rt_e12[length(rt_e12)]
+  y1<-int_e12[length(rt_e12)]
+  
+  x2<-897
+  y2<-6
+  
+  
+  stoch_line(x1,y1,x2,y2,color="palegreen3")
+  
+  p<-recordPlot()
+  Output[[2]]<-p
+  plot.new()
+  
+  return(Output)
+}
+
+
+chrom<-function(CID,EAD){
+  Output<-vector(mode="list",2)
+  setwd("C:/FUNCTION_R_DATA")
+  
+  CID_WT <- readMSData(files = "22_12_22_Exp_004_SP_Sam_WT_3_CID.mzML",mode = "onDisk") 
+  
+  EAD_WT<- readMSData(files = "22_12_22_Exp_004_SP_Sam_WT_3_EAD.mzML",mode = "onDisk")
+  
+  WT_C <- chromatogram(CID_WT, aggregationFun = "max")
+  
+  WT_E <- chromatogram(EAD_WT, aggregationFun = "max")
+  
+  rt_C<-rtime(WT_C[1,1])
+  int_C<-intensity(WT_C[1,1])
+  int_C<-int_C/max(int_C,na.rm = T)*700
+  
+  rt_E<-rtime(WT_E[1,1])
+  int_E<-intensity(WT_E[1,1])
+  int_E <- int_E/max(int_E,na.rm = T)*700
+  
+  
+  
+  #####
+  color<-c("azure4","blue4","red1","cyan3","chartreuse2","deeppink","cyan4",
+           "chartreuse4","orange4","darkorchid3","brown4",
+           "darkorange","darkmagenta","yellow3","deeppink4")
+  
+  
+  
+  D_CID <- data.frame(rt=CID$`Average Rt(min)`,
+                      mz=CID$`Average Mz`,
+                      class=CID$Ontology,
+                      col=NA)
+  
+  D_EAD <- data.frame(rt=EAD$`Average Rt(min)`,
+                      mz=EAD$`Average Mz`,
+                      class=EAD$Ontology,
+                      col=NA)
+  
+  class<-unique(c(CID$Ontology,EAD$Ontology))
+  
+  
+  for(i in 1:length(class)){
+    name<-class[i]
+    index_c<- which(D_CID$class==name)
+    index_e<-which(D_EAD$class==name )
+    D_CID$col[index_c] <- color[i]
+    D_EAD$col[index_e] <-color[i]
+  }
+  
+  
+  layout(matrix(c(1,2),ncol=2),width=c(8,2))
+  par(yaxs="r")
+  par(mar=c(5,5,5,0),cex.lab=1.4,cex.axis=1,cex.main=1.5)
+  plot(rt_C,int_C,col="coral1",cex=2,pch=16,ylab="mz",xlab="Retention Time [s]",
+       main="CID data: Total Ion Chromatogram",type="l",lwd=2,xlim=c(0,900),ylim=c(0,1000))
+  points(as.numeric(D_CID$rt)*60,D_CID$mz,pch=16,cex=1.3,col=D_CID$col)
+  par(mar=c(5,0,5,0))
+  plot(0, xaxt = 'n', yaxt = 'n', bty = 'n', pch = '', ylab = '', xlab = '')
+  legend("topleft",legend=class,col=color[1:length(class)],pch=16,pt.cex=2,cex=1.4,bty="n")
+  
+  
+  p<-recordPlot()
+  plot.new()
+  Output[[1]]<-p
+  
+  
+  
+  layout(matrix(c(1,2),ncol=2),width=c(8,2))
+  par(yaxs="r")
+  par(mar=c(5,5,5,0),cex.lab=1.4,cex.axis=1,cex.main=1.5)
+  plot(rt_E,int_E,col="palegreen3",cex=2,pch=16,ylab="mz",xlab="Retention Time [s]",
+       main="EAD data: Total Ion Chromatogram",type="l",lwd=2,xlim=c(0,900),ylim=c(0,1000))
+  points(as.numeric(D_EAD$rt)*60,D_EAD$mz,pch=16,cex=1.3,col=D_EAD$col)
+  par(mar=c(5,0,5,0))
+  plot(0, xaxt = 'n', yaxt = 'n', bty = 'n', pch = '', ylab = '', xlab = '')
+  legend("topleft",legend=class,col=color[1:length(class)],pch=16,pt.cex=2,cex=1.4,bty="n")
+  
+  p<-recordPlot()
+  plot.new()
+  Output[[2]]<-p
+  names(Output)<-c("CID","EAD")
+  
+  return(Output)
+  
+}
+
+
+
+growth <- function(type=T){
+  setwd("W:/users/Abraham/od measurement")
+  conditions <- c("Wilt Type",
+                  expression(Delta*pgpB),
+                  expression(Delta*cdh),
+                  expression(Delta*cfa),
+                  expression(Delta*plsX),
+                  expression(Delta*opgB),
+                  expression(Delta*clsC),
+                  expression(Delta*pgpC),
+                  expression(Delta*pldC),
+                  expression(Delta*clsB),
+                  expression(Delta*clsA),
+                  expression(Delta*pldB),
+                  expression(Delta*pldA),
+                  expression(Delta*pgpA),
+                  expression(Delta*aas),
+                  expression(Delta*dgkA)
+  )
+  
+  coul<-c("black","azure4","blue4","red1","cyan3","chartreuse2","deeppink","cyan4",
+          "chartreuse4","orange4","darkorchid3","brown4",
+          "darkorange","darkmagenta","yellow3","deeppink4")
+  
+  
+  ############################################################################
+  # Exponential and Stationary Growth phase:
+  ############################################################################
+  data<-read.csv("Summary_SP2_timeline.csv",row.names = 1,header=F)
+  data<-as.matrix(data)
+  data<-data[,-12]
+  x<-data[1,]
+  data<-data[-1,]
+  y<-data[1,]
+  
+  a<-x
+  b<-y
+  
+  model1 <- nls(b ~ t/ ( 1 +   (( (t-b[1])/b[1])*exp(-r*a)) )   ,start = list( t = 20,r = 0.1))
+  
+  new_a <- seq(x[1],x[length(x)]+100,length=3000) # creates new sequence of x
+  
+  
+  new_b <- predict(model1,list(a=new_a)) # predicted seuqnce of y 
+  
+  
+  
+  
+  par(mfrow=c(1,1),mar=c(5,5,3,0))
+  layout(matrix(c(1,2),ncol=2),widths = c(8,2))
+  plot(x,y,ylab="OD",xlab="Time [min]",col="black",pch=16,cex=1.6,ylim=c(0,3),main="Growth: Individual Mutants",cex.main=1.5,cex.lab=1.6,cex.axis=1.5)
+  lines(new_a,new_b,lty = c("79") ,col="black",lwd=3,lend="butt") # add line
+  points(a,b,cex=1.6,pch=16)
+  
+  points(x,y,pch=16,col="black")
+  
+  
+  
+  for(i in 2:16){
+    
+    y<-data[i,]
+    
+    
+    model1 <- nls(y ~ a/ ( 1 +   (( (a-y[1])/y[1])*exp(-r*x)) )   ,start = list( a = 20,r = 0.01))
+    
+    new_x <- seq(x[1],x[length(x)]+100,length=3000) # creates new sequence of x
+    
+    
+    new_y <- predict(model1,list(x=new_x)) # predicted seuqnce of y 
+    
+    lines(new_x,new_y,lty = c("79"),col=coul[i],lwd=2,lend="butt") # add line
+    
+    points(x,y,col=coul[i],pch=16,cex=1.6)
+    
+  }
+  
+  points(a,b,cex=1.6,pch=16)
+  
+  
+  par(mar=c(0,0,3,0))
+  plot(x,y, xaxt = 'n', yaxt = 'n', bty = 'n', pch = '', ylab = '', xlab = '')
+  
+  legend("topleft",pch=16,lty=1,col=c(coul),legend=conditions,bty="n",cex=1.5)
+  
+  
+}
+
+
+
+
+
+##################################################################################
+
+# ms2 library match
+
+ms2<-function(type=T){
+  library("grid")
+  library("cowplot")
+  setwd("W:/users/Abraham/Exp_004_version_2/Data/msp file standards/Experiment")
+  files <- list.files(pattern = "msp")
+  
+  Exp<-vector(mode="list",8) 
+  names(Exp)<-gsub("\\..*","",files)
+  
+  for(i in 1:length(files)){
+    
+    library <- read.delim(files[i], header=FALSE, comment.char="#",sep="\t", dec=",", quote="")
+    
+    
+    library1 <- library[11:nrow(library),1]
+    
+    library2 <- matrix(library1,ncol=2,byrow=T)
+    
+    
+    Exp[[i]] <- library2 
+    
+    
+  }
+  
+  
+  
+  
+  setwd("W:/users/Abraham/Exp_004_version_2/Data/msp file standards/Library")
+  files <- list.files(pattern = "txt")
+  
+  Lib<-vector(mode="list",8) 
+  names(Lib)<-gsub("\\..*","",files)
+  
+  for(i in 1:length(files)){
+    
+    lib <- read.delim(files[i], header=FALSE, comment.char="#",sep="\t", dec=",", quote="")
+    
+    
+    lib1 <- lib[13:nrow(lib),1]
+    
+    library2 <- matrix(lib1,ncol=2,byrow=T)
+    
+    
+    Lib[[i]] <- library2 
+    
+    
+  }
+  
+  
+  
+  title<-c("DG 15:0-18:1(d7)",
+           "LPC 18:1(d7)",
+           "LPE 18:1(d7)",
+           "PC 15:0-18:1(d7)",
+           "PE 15:0-18:1(d7)",
+           "PG 15:0-18:1(d7)",
+           "PS 15:0-18:1(d7)",
+           "TG 15:0-18:1(d7)-15:0")
+  
+  
+  
+  test<-matrix(ncol=2,nrow=9)
+  
+  test[1,]<-1
+  test[2,]<-c(2,3)
+  test[3,]<-c(10,11)
+  test[4,]<-c(4,5)
+  test[5,]<-c(12,13)
+  test[6,]<-c(6,7)
+  test[7,]<-c(14,15)
+  test[8,]<-c(8,9)
+  test[9,]<-c(16,17)
+  layout(test,heights = c(1,8,8,8,8,8,8,8,8))
+  par(mar=c(0,2,0,2))
+  plot(0, xaxt = 'n', yaxt = 'n', bty = 'n', pch = '', ylab = '', xlab = '')  
+  mtext(3,text="Standard Library Spectral Match",line=-2,cex=1.5)
+  
+  
+  
+  
+  
+  for(i in 1:8){
+    d2 <- Exp[[i]]
+    d4 <- Lib[[i]]
+    
+    
+    x2 <- as.numeric(d2[,1])
+    y2 <- as.numeric(d2[,2])/max(as.numeric(d2[,2]))*100
+    
+    
+    x4 <- as.numeric(d4[,1])
+    y4 <- as.numeric(d4[,2])/max(as.numeric(d4[,2]))*100
+    
+    
+    xmin=min(as.numeric(c(x2,x4)))
+    
+    xmax=max(as.numeric(c(x2,x4)))
+    
+    y2max=max(y2)
+    
+    y4max=max(y4)
+    
+    
+    par(mar=c(0,4,5,4),cex.lab=1,cex.axis=1,cex.main=1)
+    
+    plot(x2,y2,type= "h",xaxt="n",xlab="",ylab="",main=paste0(title[i]," Standard Lipid"  ),col="red",lwd=3,xaxs = "i",
+         yaxs = "i",xlim=c(xmin,xmax+10),ylim=c(0,150),yaxt="n")
+    mtext(3,text="Experimental Spectra",adj=0,col="red",line=-1.2)
+    
+    
+    
+    
+  }
+  
+  
+  
+  
+  
+  for(i in 1:8){
+    d2 <- Exp[[i]]
+    d4 <- Lib[[i]]
+    
+    
+    x2 <- as.numeric(d2[,1])
+    y2 <- as.numeric(d2[,2])/max(as.numeric(d2[,2]))*100
+    
+    
+    x4 <- as.numeric(d4[,1])
+    y4 <- as.numeric(d4[,2])/max(as.numeric(d4[,2]))*100
+    
+    
+    xmin=min(as.numeric(c(x2,x4)))
+    
+    xmax=max(as.numeric(c(x2,x4)))
+    
+    y2max=max(y2)
+    
+    y4max=max(y4)
+    
+    
+    
+    par(mar=c(5,4,0,4))
+    plot(x4,y4,type= "h",xlab="m/z",ylab="",col="blue",lwd=3,xaxs = "i",
+         yaxs = "i",xlim=c(xmin,xmax+10) ,ylim=c(150,0),yaxt="n")  
+    mtext(1,text="Reference Spectra",adj=0,col="blue",line=-1.2)
+    
+    
+    
+    
+  }
+  p<- recordPlot()
+  par(mar=c(0,4,5,4),mfrow=c(1,1))
+  plot.new()
+  
+  return(p)
+  
+  
+  
+  
+}
+
+
+
+Overlap_enriched_per_ko<-function(EAD,CID,phase,fragmentation,Directory){
+  
+  conditions <- c("Wilt Type",
+                  expression(Delta*pgpB),
+                  expression(Delta*cdh),
+                  expression(Delta*cfa),
+                  expression(Delta*plsX),
+                  expression(Delta*opgB),
+                  expression(Delta*clsC),
+                  expression(Delta*pgpC),
+                  expression(Delta*pldC),
+                  expression(Delta*clsB),
+                  expression(Delta*clsA),
+                  expression(Delta*pldB),
+                  expression(Delta*pldA),
+                  expression(Delta*pgpA),
+                  expression(Delta*aas),
+                  expression(Delta*dgkA)
+                  
+  )
+  if(phase=="EP"){
+    s<-c(c(36:80),c(84:86))
+    name <- rep(c(paste0("EP_",c("WT",c(1:15)))),each=3)
+    samples <- name[order(name)]
+  }else if(phase=="SP"){
+    s<-c(c(87:131),c(135:137))
+    name <- rep(c(paste0("SP_",c("WT",c(1:15)))),each=3)
+    samples <- name[order(name)]
+  }
+  sequence<-seq(1,45,3)
+  
+  
+  cc_C<-characteristics_CID(CID)
+  cc_E<-characteristics_EAD(EAD)
+  
+  ######################################################################
+  
+  
+  Table_C<-matrix(ncol=15,nrow=nrow(CID))
+  Table_E<-matrix(ncol=15,nrow=nrow(EAD))
+  
+  
+  
+  
+  dc<-CID[,s]
+  de<-EAD[,s]
+  i=1
+  for(i in 1:15){
+    name<-conditions[i+1]
+    
+    wt<-c(46,47,48)
+    k<-sequence[i]
+    ko<-c(k,k+1,k+2)
+    dataframe_C <- dc[,c(wt,ko)]
+    dataframeC<-matrix(as.numeric(as.matrix(dataframe_C)),ncol=6)
+    colnames(dataframeC)<-colnames(dataframe_C)
+    dataframe_C<-dataframeC
+    
+    
+    w<-rowMeans(dataframe_C[,c(1:3)])
+    k<-rowMeans(dataframe_C[,c(4:6)])
+    
+    FC<-k/w
+    
+    FC_log_C<-log2(FC)
+    
+    FC_log_C[FC_log_C==-Inf]<- min(FC_log_C)-1
+    FC_log_C[FC_log_C==Inf]<- max(FC_log_C)+1
+    
+    
+    
+    pvalue <- rep(NA,nrow(dataframe_C))  
+    
+    for(j in 1:nrow(dataframe_C)){
+      ww<-dataframe_C[j,c(1:3)]
+      kk<-dataframe_C[j,c(4:6)]
+      
+      t<-t.test(ww,kk,alternative = "two.sided",conf.level = 0.95)
+      value<- (t$p.value)
+      
+      pvalue[j]<-value
+    }
+    
+    index <- which(abs(FC_log_C)>=1 & pvalue <= 0.05)
+    
+    Table_C[index,i] <- cc_C$`Species level`[index]
+    
+    dataframe_E <- de[,c(wt,ko)]
+    dataframeE<-matrix(as.numeric(as.matrix(dataframe_E)),ncol=6)
+    colnames(dataframeE)<-colnames(dataframe_E)
+    dataframe_E<-dataframeE
+    
+    
+    w<-rowMeans(dataframe_E[,c(1:3)])
+    k<-rowMeans(dataframe_E[,c(4:6)])
+    
+    FC<-k/w
+    
+    FC_log_E<-log2(FC)
+    
+    FC_log_E[FC_log_E==-Inf]<- min(FC_log_E)-1
+    FC_log_E[FC_log_E==Inf]<- max(FC_log_E)+1
+    
+    pvalue <- rep(NA,nrow(dataframe_E))  
+    
+    for(j in 1:nrow(dataframe_E)){
+      ww<-dataframe_E[j,c(1:3)]
+      kk<-dataframe_E[j,c(4:6)]
+      
+      t<-t.test(ww,kk,alternative = "two.sided",conf.level = 0.95)
+      value<- (t$p.value)
+      
+      pvalue[j]<-value
+    }
+    
+    index <- which(abs(FC_log_E)>=1 & pvalue <= 0.05)
+    
+    Table_E[index,i] <- cc_E$`Species level`[index]
+    
+    
+    
+    
+    
+    
+    
+    
+  }
+  overlap<-matrix(ncol=15,nrow=3)
+  for(i in 1:15){
+    c<-Table_C[,i]
+    e<-Table_E[,i]
+    
+    c<-na.omit(c)
+    e<-na.omit(e)
+    overlap[3,i]<-length(which(c %in% e==T))
+    overlap[2,i]<-length(which(e %in% c==F))
+    
+    overlap[1,i]<-length(which(c %in% e==F))
+    
+  }
+  
+  
+  ov_norm<-overlap
+  for(i in 1:15){
+    ov_norm[,i] <- ov_norm[,i]/sum(ov_norm[,i])*100
+  }
+  layout(matrix(c(1,2,3),ncol=3),width=c(8,8,2))
+  par(mar=c(6,5,5,2),cex.lab=1.7,cex.axis=1.5,cex.main=1.3)
+  barplot(overlap/1.5,col=c("coral1","palegreen3","grey"),names.arg = conditions[2:16],las=2,
+          ylab = "# of Enriched Lipids",main="",cex.names=1.7)
+  mtext(side=3,"Absolute Values",cex=1.4,line=0.1)
+  x<-barplot(ov_norm,col=c("coral1","palegreen3","grey"),names.arg = conditions[2:16],las=2,
+             ylab = "Percentage of Enriched Lipids",main="",cex.names=1.7)
+  mtext(side=3,"Percentage",cex=1.4,line=0.1)
+  
+  text(x,ov_norm[1,]-7,cex=1.2,las=1,paste0(round(ov_norm[1,],digits = 0),"%"),srt = 90)
+  
+  text(x[-3],colSums(ov_norm[1:2,-3])-c(rep(4.7,13),3.1),cex=1.2,las=1,paste0(round((ov_norm[2,-3]),digits = 0),"%"),srt = 90)
+  
+  
+  text(x,colSums(ov_norm[1:3,])-15,cex=1.2,las=1,paste0(round((ov_norm[3,]),digits = 0),"%"),srt = 90)
+  
+  
+  mtext(side=3,text="Enriched Lipids Overlap across Conditions",outer = T,line=-1.8,cex=1.5)
+  
+  
+  par(mar=c(0,0,5,0))
+  plot(1:10,1:10, xaxt = 'n', yaxt = 'n', bty = 'n', pch = '', ylab = '', xlab = '')  
+  legend("topleft",col=c("coral1","palegreen3","grey"),pch=15,legend=c("CID","EAD","Overlap"),bty="n",pt.cex = 2.6,cex=2)
+  #####################################################################################
+  
+}
+
+
+
+
 

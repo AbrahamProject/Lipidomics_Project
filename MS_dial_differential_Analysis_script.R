@@ -281,7 +281,11 @@ Cairo(file=paste0(SAVE,"CID_SP.png"),
 P$PLSDA
 dev.off()
 
-
+######################
+Cairo(file=paste0(SAVE,"CID_PAPER.png"),
+      type="png",bg="white",dpi=300,units = "cm", height = 20,width =20 )
+P$PLSDA
+dev.off()
 SAVE <- "W:/users/Abraham/Exp_004_version_2/Plots/3) MS-dial data analysis/Differential Analysis/PLSDA/Variance/"
 
 Cairo(file=paste0(SAVE,"CID_SP.png"),
@@ -319,7 +323,11 @@ Cairo(file=paste0(SAVE,"EAD_EP.png"),
       type="png",bg="white",dpi=300,units = "cm", height = 20,width =30 )
 P$PLSDA
 dev.off()
-
+##################
+Cairo(file=paste0(SAVE,"EAD_PAPER.png"),
+      type="png",bg="white",dpi=300,units = "cm", height = 20,width =20 )
+P$PLSDA
+dev.off()
 
 SAVE <- "W:/users/Abraham/Exp_004_version_2/Plots/3) MS-dial data analysis/Differential Analysis/PLSDA/Variance/"
 
@@ -359,7 +367,11 @@ Cairo(file=paste0(SAVE,"EAD_SP.png"),
       type="png",bg="white",dpi=300,units = "cm", height = 20,width =30 )
 P$PLSDA
 dev.off()
-
+##################
+Cairo(file=paste0(SAVE,"EAD_PAPER.png"),
+      type="png",bg="white",dpi=300,units = "cm", height = 20,width =20 )
+P$PLSDA
+dev.off()
 
 SAVE <- "W:/users/Abraham/Exp_004_version_2/Plots/3) MS-dial data analysis/Differential Analysis/PLSDA/Variance/"
 
@@ -1029,7 +1041,7 @@ SAVE <- "W:/users/Abraham/Exp_004_version_2/Plots/3) MS-dial data analysis/Diffe
 
 # CID EP
 Cairo(file=paste0(SAVE,"CID_EP.png"),
-      type="png",bg="white",dpi=300,units = "cm", height = 29.7,width =27 )
+      type="png",bg="white",dpi=300,units = "cm", height = 20,width =30 )
 Bi_cluster(CID_EP,phase="EP",fragmentation="CID",mode="Poiss",scale=T,topN = 50)
 while (dev.cur()>1) dev.off()
 
@@ -1041,7 +1053,7 @@ while (dev.cur()>1) dev.off()
 
 # EAD EP
 Cairo(file=paste0(SAVE,"EAD_EP.png"),
-      type="png",bg="white",dpi=300,units = "cm", height = 29.7,width =27 )
+      type="png",bg="white",dpi=300,units = "cm", height = 20,width =30 )
 Bi_cluster(EAD_EP,phase="EP",fragmentation="EAD",mode="Poiss",scale=T,topN = 50)
 while (dev.cur()>1) dev.off()
 
